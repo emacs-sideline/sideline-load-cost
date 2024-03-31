@@ -56,6 +56,11 @@
   :group 'sideline-load-cost)
 
 ;;
+;;; Externals
+
+(defvar features)
+
+;;
 ;;; Util
 
 (defun sideline-load-cost--comment-p ()
@@ -92,7 +97,7 @@ Optional argument EXT is use to drop-in replace the current extension."
   "Standard time use to measure average load time.")
 
 (defun sideline-load-cost--measure-load-time (size)
-  "Measure load time cost."
+  "Measure load time cost by file's SIZE."
   (* (/ (float size) sideline-load-cost--standard-file-size)
      (car sideline-load-cost--standard-time)))
 
