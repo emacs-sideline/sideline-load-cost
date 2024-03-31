@@ -57,15 +57,9 @@
 ;;
 ;;; Util
 
-(defun sideline-load-cost--replace (old new s)
-  "Replace OLD with NEW in S."
-  (declare (pure t) (side-effect-free t))
-  (replace-regexp-in-string (regexp-quote old) new s t t))
-
-(defun sideline-load-cost--inside-comment-or-string-p ()
+(defun sideline-load-cost--comment-p ()
   "Return non-nil if it's inside comment or string."
-  (or (nth 4 (syntax-ppss))
-      (nth 8 (syntax-ppss))))
+  (nth 4 (syntax-ppss)))
 
 (defun sideline-load-cost--file-size (filename)
   "Return the FILENAME size."
@@ -73,20 +67,15 @@
              (attributes (file-attributes filename)))
     (file-attribute-size attributes)))
 
-(defun sideline-load-cost--find-size-el (filename)
-  "Return FILENAME's el size."
-  (let ((filename (sideline-load-cost--replace ".elc" ".el" filename)))
-    (sideline-load-cost--file-size filename)))
+(defun sideline-load-cost--find-size (filename &optional ext)
+  "Return FILENAME's size.
 
-(defun sideline-load-cost--find-size-elc (filename)
-  "Return FILENAME's elc size."
-  (let ((filename (sideline-load-cost--replace ".el" ".elc" filename)))
-    (sideline-load-cost--file-size filename)))
-
-(defun sideline-load-cost--find-size-elc-gz (filename)
-  "Return FILENAME's elc.gz size."
-  (let ((filename (sideline-load-cost--replace ".el" ".elc.gz" filename)))
-    (sideline-load-cost--file-size filename)))
+Optional argument EXT is use to drop-in replace the current extension."
+  (when-let* ((filename (if ext (file-name-sans-extension filename)
+                          filename))
+              (filename (concat filename ext))
+              (size (sideline-load-cost--file-size filename)))
+    (file-size-human-readable size)))
 
 ;;
 ;;; Prefix
@@ -97,7 +86,7 @@
 (defun sideline-load-cost--statement-p (line)
   "Return non-nil if LINE has the load operations."
   (cl-some (lambda (op)
-             (and (string-prefix-p (concat "(" op) line)
+             (and (string-prefix-p (concat "(" op " ") line)
                   op))
            sideline-load-cost--load-names))
 
@@ -107,8 +96,8 @@
 (defun sideline-load-cost--find-cost ()
   "Return the cost text."
   (when-let (((and (memq major-mode '(emacs-lisp-mode lisp-interaction-mode))
-                   (not (sideline-load-cost--inside-comment-or-string-p))))
-             (line (thing-at-point 'line))
+                   (not (sideline-load-cost--comment-p))))
+             (line (string-trim (thing-at-point 'line)))
              (op (sideline-load-cost--statement-p line))
              (bol (line-end-position)))
     (save-excursion
@@ -118,17 +107,26 @@
         (when-let* (((<= (point) bol))
                     (thing (or (thing-at-point 'string)
                                (thing-at-point 'symbol)))
-                    (filename (ignore-errors (find-library-name (format "%s" thing)))))
-          (let* ((size-el (sideline-load-cost--find-size-el filename))
-                 (size-elc (sideline-load-cost--find-size-elc filename))
-                 (size-elc-gz (sideline-load-cost--find-size-elc-gz filename))
-                 (text-el (and size-el
-                               (format "el: %s" (file-size-human-readable size-el))))
-                 (text-elc (and size-elc
-                                (format "elc: %s" (file-size-human-readable size-elc))))
-                 (text-elc-gz (and size-elc-gz
-                                   (format "elc.gz: %s" (file-size-human-readable size-elc-gz))))
-                 (display-list (cl-remove-if #'null (list text-el text-elc text-elc-gz)))
+                    (thing (if (stringp thing)
+                               (sideline--s-replace "\"" "" thing)
+                             thing))
+                    (filename
+                     (cond
+                      ((and (stringp thing) (file-exists-p thing))
+                       (expand-file-name thing))
+                      (t (ignore-errors (find-library-name (format "%s" thing)))))))
+          (let* ((size-any (sideline-load-cost--find-size filename))
+                 (ext (file-name-extension filename))
+                 (size-el (sideline-load-cost--find-size filename ".el"))
+                 (size-elc (sideline-load-cost--find-size filename ".elc"))
+                 (size-elc-gz (sideline-load-cost--find-size filename ".el.gz"))
+                 (text-any (and size-any
+                                (not (member ext '("el" "elc" "gz")))
+                                (format "%s: %s" ext size-any)))
+                 (text-el (and size-el (format "el: %s" size-el)))
+                 (text-elc (and size-elc (format "elc: %s" size-elc)))
+                 (text-elc-gz (and size-elc-gz (format "elc.gz: %s" size-elc-gz)))
+                 (display-list (cl-remove-if #'null (list text-any text-el text-elc text-elc-gz)))
                  (text (mapconcat #'identity display-list " / ")))
             text))))))
 
