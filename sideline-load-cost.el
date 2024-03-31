@@ -39,6 +39,7 @@
 
 ;;; Code:
 
+(require 'benchmark)
 (require 'find-func)
 
 (require 'sideline)
@@ -68,14 +69,32 @@
     (file-attribute-size attributes)))
 
 (defun sideline-load-cost--find-size (filename &optional ext)
-  "Return FILENAME's size.
+  "Return FILENAME's (extension . size).
 
 Optional argument EXT is use to drop-in replace the current extension."
   (when-let* ((filename (if ext (file-name-sans-extension filename)
                           filename))
               (filename (concat filename ext))
               (size (sideline-load-cost--file-size filename)))
-    (file-size-human-readable size)))
+    (cons (or ext (file-name-extension filename))
+          size)))
+
+;;
+;;; Standard
+
+(defvar sideline-load-cost--standard-time
+  (benchmark-run 1 (let ((features)) (require 'sideline)))
+  "Standard time use to measure average load time.")
+
+(defvar sideline-load-cost--standard-file-size
+  (let ((lib (find-library-name "sideline")))
+    (sideline-load-cost--file-size lib))
+  "Standard time use to measure average load time.")
+
+(defun sideline-load-cost--measure-load-time (size)
+  "Measure load time cost."
+  (* (/ (float size) sideline-load-cost--standard-file-size)
+     (car sideline-load-cost--standard-time)))
 
 ;;
 ;;; Prefix
@@ -115,20 +134,17 @@ Optional argument EXT is use to drop-in replace the current extension."
                       ((and (stringp thing) (file-exists-p thing))
                        (expand-file-name thing))
                       (t (ignore-errors (find-library-name (format "%s" thing)))))))
-          (let* ((size-any (sideline-load-cost--find-size filename))
-                 (ext (file-name-extension filename))
-                 (size-el (sideline-load-cost--find-size filename ".el"))
-                 (size-elc (sideline-load-cost--find-size filename ".elc"))
-                 (size-elc-gz (sideline-load-cost--find-size filename ".el.gz"))
-                 (text-any (and size-any
-                                (not (member ext '("el" "elc" "gz")))
-                                (format "%s: %s" ext size-any)))
-                 (text-el (and size-el (format "el: %s" size-el)))
-                 (text-elc (and size-elc (format "elc: %s" size-elc)))
-                 (text-elc-gz (and size-elc-gz (format "elc.gz: %s" size-elc-gz)))
-                 (display-list (cl-remove-if #'null (list text-any text-el text-elc text-elc-gz)))
-                 (text (mapconcat #'identity display-list " / ")))
-            text))))))
+          (let* ((size-data (or (sideline-load-cost--find-size filename ".el.gz")
+                                (sideline-load-cost--find-size filename ".elc")
+                                (sideline-load-cost--find-size filename ".el")
+                                (sideline-load-cost--find-size filename)))
+                 (size (cdr size-data))
+                 (ext (car size-data))
+                 (text-size (and size
+                                 (format "%s: %s" ext (file-size-human-readable size))))
+                 (time (sideline-load-cost--measure-load-time size))
+                 (text-time (format "(%.2fs)" time)))
+            (concat text-size " " text-time)))))))
 
 ;;;###autoload
 (defun sideline-load-cost (command)
