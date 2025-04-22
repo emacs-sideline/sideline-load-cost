@@ -1,3 +1,5 @@
+;; -*- mode: eask; lexical-binding: t -*-
+
 (package "sideline-load-cost"
          "0.1.0"
          "Display load/require module size with sideline")
