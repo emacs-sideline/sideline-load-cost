@@ -69,8 +69,8 @@
 
 (defun sideline-load-cost--file-size (filename)
   "Return the FILENAME size."
-  (when-let (((file-readable-p filename))
-             (attributes (file-attributes filename)))
+  (when-let* (((file-readable-p filename))
+              (attributes (file-attributes filename)))
     (file-attribute-size attributes)))
 
 (defun sideline-load-cost--find-size (filename &optional ext)
@@ -119,11 +119,12 @@ Optional argument EXT is use to drop-in replace the current extension."
 
 (defun sideline-load-cost--find-cost ()
   "Return the cost text."
-  (when-let (((and (memq major-mode '(emacs-lisp-mode lisp-interaction-mode))
-                   (not (sideline-load-cost--comment-p))))
-             (line (string-trim (thing-at-point 'line)))
-             (op (sideline-load-cost--statement-p line))
-             (bol (line-end-position)))
+  (when-let* (((and (memq major-mode '(emacs-lisp-mode lisp-interaction-mode))
+                    (not (sideline-load-cost--comment-p))))
+              (line (thing-at-point 'line))
+              (line (string-trim line))
+              (op (sideline-load-cost--statement-p line))
+              (bol (line-end-position)))
     (save-excursion
       (beginning-of-line)
       (when (search-forward op bol t)
