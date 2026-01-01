@@ -1,6 +1,6 @@
 ;;; sideline-load-cost.el --- Display load/require module size with sideline  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2024-2025  Shen, Jen-Chieh
+;; Copyright (C) 2024-2026  Shen, Jen-Chieh
 
 ;; Author: Shen, Jen-Chieh <jcs090218@gmail.com>
 ;; Maintainer: Shen, Jen-Chieh <jcs090218@gmail.com>
